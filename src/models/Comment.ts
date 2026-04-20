@@ -1,0 +1,8 @@
+export interface Comment {
+    id: number;
+    text: string;
+    postId: number;
+    userId: number;
+  }
+  
+  export const comments: Comment[] = [];
