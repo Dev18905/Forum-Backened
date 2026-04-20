@@ -1,47 +1,114 @@
-import { posts } from "../models/Post";
+import { Request, Response } from "express";
+import { db } from "../db";
+import { AuthRequest } from "../middleware/authMiddleware";
 
-let postId = 1;
+export const postController = {
+  createPost: (req: AuthRequest, res: Response) => {
+    const { title, content } = req.body;
+    const userId = req.user.id;
 
-export const createPost = (req: any, res: any) => {
-  const { title, content, userId } = req.body;
+    if (!title || !content) {
+      return res.status(400).json({ message: "Title and content are required" });
+    }
 
-  const post = {
-    id: postId++,
-    title,
-    content,
-    userId,
-    likes: 0
-  };
+    db.run(
+      "INSERT INTO posts (title, content, userId) VALUES (?, ?, ?)",
+      [title, content, userId],
+      function (error) {
+        if (error) {
+          return res.status(500).json({ message: "Could not create post" });
+        }
 
-  posts.push(post);
+        return res.status(201).json({
+          message: "Post created successfully",
+          postId: this.lastID
+        });
+      }
+    );
+  },
 
-  res.json(post);
-};
+  getAllPosts: (_req: Request, res: Response) => {
+    db.all("SELECT * FROM posts ORDER BY createdAt DESC", [], (error, rows) => {
+      if (error) {
+        return res.status(500).json({ message: "Could not fetch posts" });
+      }
 
-export const getPosts = (req: any, res: any) => {
-  res.json(posts);
-};
+      return res.status(200).json(rows);
+    });
+  },
 
-export const deletePost = (req: any, res: any) => {
-  const id = Number(req.params.id);
+  getPostById: (req: Request, res: Response) => {
+    const postId = Number(req.params.id);
 
-  const index = posts.findIndex(p => p.id === id);
+    db.get("SELECT * FROM posts WHERE id = ?", [postId], (error, row) => {
+      if (error) {
+        return res.status(500).json({ message: "Could not fetch post" });
+      }
 
-  if (index === -1) return res.status(404).json("Post not found");
+      if (!row) {
+        return res.status(404).json({ message: "Post not found" });
+      }
 
-  posts.splice(index, 1);
+      return res.status(200).json(row);
+    });
+  },
 
-  res.json("Post deleted");
-};
+  updatePost: (req: AuthRequest, res: Response) => {
+    const postId = Number(req.params.id);
+    const { title, content } = req.body;
+    const userId = req.user.id;
 
-export const likePost = (req: any, res: any) => {
-  const id = Number(req.params.id);
+    db.get("SELECT * FROM posts WHERE id = ?", [postId], (selectError, post: any) => {
+      if (selectError) {
+        return res.status(500).json({ message: "Database error" });
+      }
 
-  const post = posts.find(p => p.id === id);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
 
-  if (!post) return res.status(404).json("Post not found");
+      if (post.userId !== userId) {
+        return res.status(403).json({ message: "You can only edit your own post" });
+      }
 
-  post.likes++;
+      db.run(
+        "UPDATE posts SET title = ?, content = ? WHERE id = ?",
+        [title, content, postId],
+        (updateError) => {
+          if (updateError) {
+            return res.status(500).json({ message: "Could not update post" });
+          }
 
-  res.json(post);
+          return res.status(200).json({ message: "Post updated successfully" });
+        }
+      );
+    });
+  },
+
+  deletePost: (req: AuthRequest, res: Response) => {
+    const postId = Number(req.params.id);
+    const userId = req.user.id;
+
+    db.get("SELECT * FROM posts WHERE id = ?", [postId], (selectError, post: any) => {
+      if (selectError) {
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      if (post.userId !== userId) {
+        return res.status(403).json({ message: "You can only delete your own post" });
+      }
+
+      db.run("DELETE FROM posts WHERE id = ?", [postId], (deleteError) => {
+        if (deleteError) {
+          return res.status(500).json({ message: "Could not delete post" });
+        }
+
+        return res.status(200).json({ message: "Post deleted successfully" });
+      });
+    });
+  }
 };

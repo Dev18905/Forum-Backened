@@ -1,21 +1,13 @@
-import express from "express";
-import {
-  createPost,
-  getPosts,
-  deletePost,
-  likePost
-} from "../controllers/postController";
+import { Router } from "express";
+import { postController } from "../controllers/postController";
+import { authMiddleware } from "../middleware/authMiddleware";
 
-import { addComment } from "../controllers/commentController";
+const router = Router();
 
-const router = express.Router();
-
-router.post("/", createPost);
-router.get("/", getPosts);
-router.delete("/:id", deletePost);
-router.post("/:id/like", likePost);
-
-// comments
-router.post("/:postId/comment", addComment);
+router.get("/", postController.getAllPosts);
+router.get("/:id", postController.getPostById);
+router.post("/", authMiddleware, postController.createPost);
+router.put("/:id", authMiddleware, postController.updatePost);
+router.delete("/:id", authMiddleware, postController.deletePost);
 
 export default router;
